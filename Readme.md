@@ -1,13 +1,13 @@
 Para instalar a @kirito/cloudflared na sua aplicação basta utilizar 
 
-```npm i @kirito/cloudflared```
+```npm i @kirito/cloudflared.subservice```
 
 No console.
 
 # Rotas da KiritoApi
 
 ```js
-const Cloudflared = require('@kirito/cloudflared');
+const Cloudflared = require('@kirito/cloudflared.subservice');
 
 async function startTunnel(port) {
   try {      
