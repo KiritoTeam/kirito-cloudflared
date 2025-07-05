@@ -1,238 +1,231 @@
-client = require("./index");
-const Urlbase = "https://npm-kiritoapi.ecoguardiao.tech"
+const { bin, install, Tunnel } = require("cloudflared");
+const { getServers, setServers, lookup } = require("dns");
+const { existsSync } = require("fs");
+const { EventEmitter } = require("events");
+const { Timer } = require("@gibme/timer");
+const fetch = require("@gibme/fetch").default;
 
-// Script by CroneGamesPlays Developer, NeoKurai Studios $ Adss Group Corporation © 2020 - 2024 × Todos os direitos reservados.
+class Cloudflared extends EventEmitter {
+    constructor(local_url, check_interval = 2000) {
+        super();
+        this.local_url = local_url;
+        this.system_dns_servers = getServers();
+        this._connections = new Set();
+        this._dns_ready = false;
+        this._https_ready = false;
 
-const axios = require('axios');
-//const fetch = require("node-fetch");
+        setServers([
+            ...this.system_dns_servers,
+            "1.1.1.1",
+            "8.8.8.8",
+            "9.9.9.9"
+        ]);
 
-class KiritoApi {
-    
-  constructor() {
-    // Você pode inicializar instâncias aqui, se necessário
-  }
+        this.dns_servers = getServers();
 
-  //Métodos da class do KiritoAPI
+        this.dns_timer = new Timer(check_interval, true);
+        this.https_timer = new Timer(check_interval, true);
+        this.ready_timer = new Timer(check_interval, true);
 
-async ping(ping) {
-    try {
-      
-      
-      const api = await axios.get(`${Urlbase}`)
-      
-      return api.data;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+        this.dns_timer.on("tick", async () => {
+            if (this.hostname) {
+                if (await this.dns_exists()) {
+                    this._dns_ready = true;
+                    this.emit("subservice", {
+                        timestamp: new Date(),
+                        url: this.url,
+                        hostname: this.hostname,
+                        connections: this.connections,
+                        type: "dns"
+                    });
+                    this.dns_timer.destroy();
+                } else {
+                    this.emit("progress", {
+                        timestamp: new Date(),
+                        url: this.url,
+                        hostname: this.hostname,
+                        connections: this.connections,
+                        type: "dns",
+                        status: "not_ready"
+                    });
+                }
+            }
+        });
+
+        this.https_timer.on("tick", async () => {
+            if (this.hostname) {
+                if (await this.https_exists()) {
+                    this._https_ready = true;
+                    this.emit("subservice", {
+                        timestamp: new Date(),
+                        url: this.url,
+                        hostname: this.hostname,
+                        connections: this.connections,
+                        type: "https"
+                    });
+                    this.https_timer.destroy();
+                } else {
+                    this.emit("progress", {
+                        timestamp: new Date(),
+                        url: this.url,
+                        hostname: this.hostname,
+                        connections: this.connections,
+                        type: "https",
+                        status: "not_ready"
+                    });
+                }
+            }
+        });
+
+        this.ready_timer.on("tick", async () => {
+            if (this.ready) {
+                this.emit("ready", {
+                    timestamp: new Date(),
+                    url: this.url,
+                    hostname: this.hostname,
+                    connections: this.connections
+                });
+                this.ready_timer.destroy();
+            }
+        });
     }
-  };
 
-
- 
-  async mineinfo(i, ve) {
-    try {
-      const v = ve || "v1"
-      
-      if (!v) {
-          throw new Error("Você Deve Informar a versão");
-      };
-      if (!i) {
-          throw new Error("Você Deve Informar O ip do servidor");
-      };
-      
-      const api = await axios.get(`${Urlbase}/api/${v}/mine/server/${i}`)
-      
-      return api.data;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+    get url() {
+        return this._url;
     }
-  };
-  
-  
-  
-  
-  
-  
-  async minebanner(i, ve) {
-    try {
-      const v = ve || "v1"
-      
-      if (!v) {
-          throw new Error("Você Deve Informar a versão");
-      };
-      if (!i) {
-          throw new Error("Você Deve Informar O Ip Do Servidor");
-      };
-      
-      const api = await axios.get(`${Urlbase}/api/${v}/mine/server/banner/${i}`)
-      
-      return api.data.banner;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+
+    get hostname() {
+        return this._hostname;
     }
-  };
-  
-  
-  
-  
-  
-  
-  async userinfo(i, ve) {
-    try {
-      const v = ve || "v5"
-      
-      if (!v) {
-          throw new Error("Você Deve Informar a versão");
-      };
-      if (!i) {
-          throw new Error("Você Deve Informar O Id Do Usuário");
-      };
-      
-      const api = await axios.get(`${Urlbase}/api/${v}/discord/user/${i}`)
-      
-      return api.data;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+
+    get connections() {
+        return this._connections;
     }
-  };
-  
-  
-     
-  
-  
-async chat(p, ve, ii) {
-    try {
-      const v = ve || "v1"
-      const i = ii || "gemini"
-      
-      if (!v) {
-          throw new Error("Você Deve Informar a versão");
-      };
-      if (!i) {
-          throw new Error("Você Deve Informar O qual ia será utilizada");
-      };
-      if (!p) {
-          throw new Error("Você Deve Informar O prompt");
-      };
-      
-      const api = await axios.get(`${Urlbase}/api/${v}/chat/${i}?prompt=${p}`)
-      
-      return api.data;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+
+    get dns_ready() {
+        return this._dns_ready;
     }
-  };
 
-          
-  async setBannerBot(t, l, ve) {
-    try {
-      const v = ve || "v1"
-      
-      if (!v) {
-          throw new Error("Você Deve Informar a versão");
-      };
-      if (!t) {
-          throw new Error("Você Deve Informar o Token Do Bot a Qual Deseja Mudar o Banner");
-      };
-      if (!l) {
-          throw new Error("Você Deve Informar o Link Do Banner");
-      };
-        
-      
-      const api = await axios.get(`${Urlbase}/api/${v}/discord/banner?token=${t}&link=${l}`)
-      
-      return api.data;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+    get https_ready() {
+        return this._https_ready;
     }
-  };
 
-
-
-  async inviteInfo(l, ve) {
-    try {
-      const v = ve || "v1"
-      
-      if (!v) {
-          throw new Error("Você Deve Informar a versão");
-      };
-      if (!l) {
-          throw new Error("Você Deve Informar O Link Do Servidor");
-      };
-      
-      const api = await axios.get(`${Urlbase}/api/${v}/discord/invite?link=${l}`)
-      
-      return api.data;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+    get ready() {
+        return !!this._url;
+        //return this.dns_ready && this.https_ready;
     }
-  };
 
-
- async GithubUserinfo(i, ve) {
-    try {
-      const v = ve || "v1"
-      
-      if (!v) {
-          throw new Error("Você Deve Informar a versão");
-      };
-      if (!i) {
-          throw new Error("Você Deve Informar O Nome Do Usuário");
-      };
-      
-      const api = await axios.get(`${Urlbase}/api/${v}/github/user/${i}`)
-      
-      return api.data;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+    get tunnel() {
+        return this._tunnel;
     }
-  };
 
-
- async youtubeInfo(i, ve) {
-    try {
-      const v = ve || "v1"
-      
-      if (!v) {
-          throw new Error("Você Deve Informar a versão");
-      };
-      if (!i) {
-          throw new Error("Você Deve Informar O Nome Do Usuário");
-      };
-      
-      const api = await axios.get(`${Urlbase}/api/${v}/youtube/infos/${i}`)
-      
-      return api.data;
-      
-    } catch(error){
-    throw new Error("Erro: "+ error.message)   
+    static async install_cloudflared() {
+        try {
+            if (!existsSync(bin)) {
+                await install(bin);
+            }
+            return bin;
+        } catch (_) {
+            return null;
+        }
     }
-  };
 
-    
- 
-  
-  
+    on(event, listener) {
+        return super.on(event, listener);
+    }
+
+    once(event, listener) {
+        return super.once(event, listener);
+    }
+
+    off(event, listener) {
+        return super.off(event, listener);
+    }
+
+    async start(timeout = 30000) {
+        if (this.tunnel) return true;
+
+        if (!(await Cloudflared.install_cloudflared())) return false;
+
+        this._timeout = setTimeout(() => {
+            if (!this.ready) {
+                this.stop();
+                this.emit("timeout", new Error("Tunnel could not be started within the given timeout."));
+            }
+        }, timeout);
+
+        try {
+            this._tunnel = Tunnel.quick(this.local_url);
+            this._tunnel.once("url", (url) => {
+                this._url = url;
+                this._hostname = new URL(url).hostname;
+            });
+
+            this._tunnel.once("connected", (connection) => {
+                this._connections.clear();
+                this._connections.add(connection);
+            });
+
+            this.emit("started");
+            return true;
+        } catch (_) {
+            this.cleanup();
+            return false;
+        }
+    }
+
+    async stop() {
+        this.cleanup();
+        if (!this.tunnel) return true;
+
+        try {
+            this.tunnel.process.kill("SIGINT");
+        } catch (_) {}
+
+        try {
+            this.tunnel.process.kill();
+        } catch (_) {}
+
+        const result = this.tunnel.stop();
+        delete this._tunnel;
+        this.emit("stopped");
+        return result;
+    }
+
+    cleanup() {
+        this.dns_timer.destroy();
+        this.https_timer.destroy();
+        this.ready_timer.destroy();
+        delete this._hostname;
+        this._connections.clear();
+        delete this._url;
+    }
+
+    async https_exists() {
+        try {
+            if (this.url) {
+                await fetch.get(this.url);
+                return true;
+            } else {
+                return false;
+            }
+        } catch (_) {
+            return false;
+        }
+    }
+
+    async dns_exists() {
+        return new Promise((resolve) => {
+            if (this.hostname) {
+                lookup(this.hostname, (error) => {
+                    resolve(!error);
+                });
+            } else {
+                resolve(false);
+            }
+        });
+    }
 }
 
-
-
-module.exports = KiritoApi;
-
-require("./update");
-
-
-process.on("uncaughtException", (err) => {
-  console.log("Exceção não capturada: " + err);
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  console.log("[GRAVE] Rejeição possivelmente não tratada em: Promise ", promise, " motivo: ", reason.message);
-});
+module.exports = Cloudflared;
+    
