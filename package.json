@@ -1,5 +1,5 @@
 {
-  "name": "@kirito/cloudflared",
+  "name": "@kirito/cloudflared.subservice",
   "version": "1.0.0-alfa",
   "description": "Kirito Cloudflared e ótimo para criar tunnels da cloudflared para expor a sua aplicação a internet.",
   "main": "index.js",
